@@ -36,6 +36,14 @@ function getChannels() {
   return toArray(channels);
 }
 
+function getLastMessageTimestamp(channelId: string) {
+  const IPDX = Slack.getOrCreate("ipdx")
+  let messages = IPDX.get("conversations.history", "channel", channelId);
+  messages = flatMap(messages, "messages");
+  messages = mapReduce(messages, "ts", "type");
+  return messages.find((message: any) => message.type === "message")?.ts;
+}
+
 function getChannelsWithLastMessageTimestamp() {
   const IPDX = Slack.getOrCreate("ipdx")
   const publicChannels = IPDX.getPaginated("conversations.list", "types", "public_channel", "exclude_archived", "true");
@@ -45,10 +53,7 @@ function getChannelsWithLastMessageTimestamp() {
 
   channels = channels.map(channel => {
     if (channel.is_member) {
-      let messages = IPDX.get("conversations.history", "channel", channel.id);
-      messages = flatMap(messages, "messages");
-      messages = mapReduce(messages, "ts", "type");
-      channel.last_message_ts = messages.find((message: any) => message.type === "message")?.ts;
+      channel.last_message_ts = getLastMessageTimestamp(channel.id);
       return channel;
     } else {
       return channel;
