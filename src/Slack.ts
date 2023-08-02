@@ -92,29 +92,40 @@ class Slack {
   }
 
   public get(endpoint: string, ...args: string[]): any {
-    let url = `https://slack.com/api/${endpoint}`;
-    if (args) {
-      let separator = "?";
-      for (const arg of args) {
-        url += `${separator}${encodeURIComponent(arg)}`;
-        separator = separator === "=" ? "&" : "=";
+    try {
+      let url = `https://slack.com/api/${endpoint}`;
+      if (args) {
+        let separator = "?";
+        for (const arg of args) {
+          url += `${separator}${encodeURIComponent(arg)}`;
+          separator = separator === "=" ? "&" : "=";
+        }
+      }
+      const headers = {
+        Authorization: `Bearer ${this.getAccessToken()}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      };
+      console.log({
+        url,
+        headers,
+      })
+      const response = UrlFetchApp.fetch(url, { headers, muteHttpExceptions: true });
+      const text = response.getContentText();
+      const json = JSON.parse(text);
+      if (!json.ok) {
+        throw new Error(json.error);
+      }
+      return json;
+    } catch (e) {
+      if (e.message === "ratelimited") {
+        // Sleep for a minute and try again
+        console.log("Rate limited, sleeping for a minute");
+        Utilities.sleep(60000);
+        return this.get(endpoint, ...args);
+      } else {
+        throw e;
       }
     }
-    const headers = {
-      Authorization: `Bearer ${this.getAccessToken()}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    };
-    console.log({
-      url,
-      headers,
-    })
-    const response = UrlFetchApp.fetch(url, { headers });
-    const text = response.getContentText();
-    const json = JSON.parse(text);
-    if (!json.ok) {
-      throw new Error(json.error);
-    }
-    return json;
   }
 
   public getPaginated(endpoint: string, ...args: string[]): any[] {
