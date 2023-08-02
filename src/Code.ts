@@ -7,6 +7,14 @@ const CLIENT_ID = PropertiesService.getScriptProperties().getProperty(
 const CLIENT_SECRET = PropertiesService.getScriptProperties().getProperty(
   "CLIENT_SECRET"
 ) as string;
+
+const CLASSIC_CLIENT_ID = PropertiesService.getScriptProperties().getProperty(
+  "CLASSIC_CLIENT_ID"
+) as string;
+const CLASSIC_CLIENT_SECRET = PropertiesService.getScriptProperties().getProperty(
+  "CLASSIC_CLIENT_SECRET"
+) as string;
+
 // const SCOPE = 'channels:history,channels:read,groups:history,groups:read,usergroups:read,users:read,users:read.email'
 const USER_SCOPE =
   "channels:history,channels:read,groups:history,groups:read,search:read,usergroups:read,users:read,users:read.email";
@@ -16,7 +24,9 @@ function onOpen(e) {
   SpreadsheetApp.getUi()
     .createMenu("Slack")
     .addItem("Authorize IPDX", "authorize")
-    .addItem("Reset Authorization", "reset")
+    .addItem("Reset IPDX Authorization", "reset")
+    .addItem("Authorize IPDX (Classic)", "authorizeClassic")
+    .addItem("Reset IPDX (Classic) Authorization", "resetClassic")
     .addToUi();
 }
 
@@ -24,19 +34,22 @@ function getOAuthService() {
   return OAuth2.createService("slack")
     .setAuthorizationBaseUrl("https://slack.com/oauth/v2/authorize")
     .setTokenUrl("https://slack.com/api/oauth.v2.access")
-    .setTokenFormat(
-      "application/x-www-form-urlencoded" as GoogleAppsScriptOAuth2.TokenFormat
-    )
     .setCallbackFunction("authCallback")
-    .setPropertyStore(PropertiesService.getUserProperties())
+    .setPropertyStore(PropertiesService.getScriptProperties())
     .setParam("user_scope", USER_SCOPE)
-    .setTokenPayloadHandler((payload) => {
-      // Otherwise, we get invalid_code error on the callback
-      delete (payload as any).client_id;
-      return payload;
-    })
     .setClientId(CLIENT_ID)
     .setClientSecret(CLIENT_SECRET);
+}
+
+function getClassicOAuthService() {
+  return OAuth2.createService("slack-classic")
+    .setAuthorizationBaseUrl("https://slack.com/oauth/authorize")
+    .setTokenUrl("https://slack.com/api/oauth.access")
+    .setCallbackFunction("authCallbackClassic")
+    .setPropertyStore(PropertiesService.getScriptProperties())
+    .setScope(USER_SCOPE)
+    .setClientId(CLASSIC_CLIENT_ID)
+    .setClientSecret(CLASSIC_CLIENT_SECRET);
 }
 
 function authCallback(callbackRequest) {
@@ -44,50 +57,53 @@ function authCallback(callbackRequest) {
   const authorized = service.handleCallback(callbackRequest);
   let template;
   if (authorized) {
-    const url = `https://slack.com/api/oauth.v2.access`;
-    const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
-      method: "post",
-      muteHttpExceptions: true,
-      contentType: "application/x-www-form-urlencoded",
-      payload: `code=${
-        callbackRequest.parameter.code
-      }&client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}&redirect_uri=${encodeURIComponent(
-        REDIRECT_URI
-      )}`,
-    };
-    const response = UrlFetchApp.fetch(url, options);
-    const json = JSON.parse(response.getContentText());
-    if (json.ok) {
-      const store = PropertiesService.getUserProperties();
-      store.setProperty(
-        "SLACK_USER_ACCESS_TOKEN",
-        json.authed_user.access_token
-      );
-      // store.setProperty('SLACK_BOT_ACCESS_TOKEN', json.access_token);
-      try {
-        const test = _get("auth.test");
-        store.setProperty("SLACK_USER_ID", test.user_id);
-        template = HtmlService.createTemplateFromFile("Success");
-        template.user = test.user;
-      } catch (e) {
-        template = HtmlService.createTemplateFromFile("Failure");
-        template.code = JSON.stringify(e, null, 2);
-      }
-    } else {
-      template = HtmlService.createTemplateFromFile("Failure");
-      template.code = JSON.stringify(
-        [callbackRequest, url, options, json],
-        null,
-        2
-      );
-    }
+    const accessToken = JSON.parse(PropertiesService.getScriptProperties().getProperty("oauth2.slack")).authed_user.access_token;
+    PropertiesService.getScriptProperties().setProperty("SLACK_USER_ACCESS_TOKEN", accessToken);
+    template = HtmlService.createTemplateFromFile("Success");
   } else {
     template = HtmlService.createTemplateFromFile("Failure");
-    template.code = JSON.stringify(callbackRequest, null, 2);
+    template.code = JSON.stringify(service.getAccessToken(), null, 2);
   }
   const page = template.evaluate();
   SpreadsheetApp.getUi().showModalDialog(page, "Authorization Result");
   return page;
+}
+
+function authCallbackClassic(callbackRequest) {
+  const service = getClassicOAuthService();
+  const authorized = service.handleCallback(callbackRequest);
+  let template;
+  if (authorized) {
+    const accessToken = service.getAccessToken();
+    PropertiesService.getScriptProperties().setProperty("SLACK_USER_ACCESS_TOKEN", accessToken);
+    template = HtmlService.createTemplateFromFile("Success");
+  } else {
+    template = HtmlService.createTemplateFromFile("Failure");
+    template.code = JSON.stringify(service.getAccessToken(), null, 2);
+  }
+  const page = template.evaluate();
+  SpreadsheetApp.getUi().showModalDialog(page, "Authorization Result");
+  return page;
+}
+
+function getToken() {
+  const service = getOAuthService();
+  return service.getToken();
+}
+
+function getAccessToken() {
+  const service = getOAuthService();
+  return service.getAccessToken();
+}
+
+function getClassicToken() {
+  const service = getClassicOAuthService();
+  return service.getToken();
+}
+
+function getClassicAccessToken() {
+  const service = getClassicOAuthService();
+  return service.getAccessToken();
 }
 
 function authorize() {
@@ -98,13 +114,26 @@ function authorize() {
   SpreadsheetApp.getUi().showModalDialog(page, "Authorize IPDX");
 }
 
+function authorizeClassic() {
+  const service = getClassicOAuthService();
+  const template = HtmlService.createTemplateFromFile("Authorize");
+  template.authorizationUrl = service.getAuthorizationUrl();
+  const page = template.evaluate();
+  SpreadsheetApp.getUi().showModalDialog(page, "Authorize IPDX (Classic)");
+}
+
 function reset() {
   const service = getOAuthService();
   service.reset();
 }
 
+function resetClassic() {
+  const service = getClassicOAuthService();
+  service.reset();
+}
+
 function _get(endpoint, ...args) {
-  const store = PropertiesService.getUserProperties();
+  const store = PropertiesService.getScriptProperties();
   let url = `https://slack.com/api/${endpoint}`;
   if (args) {
     let separator = "?";
