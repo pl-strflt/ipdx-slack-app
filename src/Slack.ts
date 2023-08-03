@@ -20,8 +20,12 @@ class Slack {
     }
 
     const isClassic = userScope === null;
-    const authorizationBaseUrl: string = isClassic ? "https://slack.com/oauth/authorize" : "https://slack.com/oauth/v2/authorize";
-    const tokenUrl: string = isClassic ? "https://slack.com/api/oauth.access" : "https://slack.com/api/oauth.v2.access";
+    const authorizationBaseUrl: string = isClassic
+      ? "https://slack.com/oauth/authorize"
+      : "https://slack.com/oauth/v2/authorize";
+    const tokenUrl: string = isClassic
+      ? "https://slack.com/api/oauth.access"
+      : "https://slack.com/api/oauth.v2.access";
 
     this.name = name;
     this.service = OAuth2.createService(name)
@@ -46,19 +50,27 @@ class Slack {
     }
   }
 
-  public static handleCallback(callbackRequest: GoogleAppsScript.Events.DoGet): GoogleAppsScript.HTML.HtmlOutput {
+  public static handleCallback(
+    callbackRequest: GoogleAppsScript.Events.DoGet
+  ): GoogleAppsScript.HTML.HtmlOutput {
     const instance = Slack.getOrCreate(callbackRequest.parameter.serviceName);
     if (instance === undefined) {
-      return HtmlService.createHtmlOutput(`Unknown service: ${callbackRequest.parameter.serviceName}`);
+      return HtmlService.createHtmlOutput(
+        `Unknown service: ${callbackRequest.parameter.serviceName}`
+      );
     } else {
       return instance.handleCallback(callbackRequest);
     }
   }
 
-  public handleCallback(callbackRequest: GoogleAppsScript.Events.DoGet): GoogleAppsScript.HTML.HtmlOutput {
+  public handleCallback(
+    callbackRequest: GoogleAppsScript.Events.DoGet
+  ): GoogleAppsScript.HTML.HtmlOutput {
     const authorized = this.service.handleCallback(callbackRequest);
     if (authorized) {
-      return HtmlService.createHtmlOutput(`Success! ${this.name} is authorized. You can close this tab.`);
+      return HtmlService.createHtmlOutput(
+        `Success! ${this.name} is authorized. You can close this tab.`
+      );
     } else {
       return HtmlService.createHtmlOutput(`Denied. You can close this tab`);
     }
@@ -108,8 +120,11 @@ class Slack {
       console.log({
         url,
         headers,
-      })
-      const response = UrlFetchApp.fetch(url, { headers, muteHttpExceptions: true });
+      });
+      const response = UrlFetchApp.fetch(url, {
+        headers,
+        muteHttpExceptions: true,
+      });
       const text = response.getContentText();
       const json = JSON.parse(text);
       if (!json.ok) {
@@ -130,7 +145,9 @@ class Slack {
 
   public getPaginated(endpoint: string, ...args: string[]): any[] {
     const responses = [this.get(endpoint, ...args)];
-    while (responses[responses.length - 1].response_metadata.next_cursor !== "") {
+    while (
+      responses[responses.length - 1].response_metadata.next_cursor !== ""
+    ) {
       responses.push(
         this.get(
           endpoint,
