@@ -40,7 +40,7 @@ function getChannels() {
   const privateChannels = IPDX.getPaginated(
     "conversations.list",
     "types",
-    "public_channel",
+    "private_channel",
     "exclude_archived",
     "true"
   );
@@ -70,7 +70,7 @@ function getChannelsWithLastMessageTimestamp() {
   const privateChannels = IPDX.getPaginated(
     "conversations.list",
     "types",
-    "public_channel",
+    "private_channel",
     "exclude_archived",
     "true"
   );
