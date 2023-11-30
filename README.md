@@ -1,3 +1,6 @@
+> [!WARNING]  
+> This project is now deprecated.
+
 # IPDX Slack App
 
 ## Permissions
